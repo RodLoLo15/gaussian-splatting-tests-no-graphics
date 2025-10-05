@@ -73,10 +73,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     progress_bar = tqdm(range(first_iter, opt.iterations), desc="Training progress")
 
-    #Se agrega listas vacías para insertar valores del bucle generados
-    u_t_list = []
-    lambda_t_list = []
-
     first_iter += 1
     for iteration in range(first_iter, opt.iterations + 1):
         if network_gui.conn == None:
@@ -137,8 +133,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         U_t = gaussians.calculate_uncertainty().detach()
         lambda_t = 1 - torch.exp(-beta * U_t)
         lambda_t = torch.clamp(lambda_t, min = 0.0, max = 1.0)
-        u_t_list.append(U_t.item())
-        lambda_t_list.append(lambda_t.item()) 
 
         loss = (1.0 - lambda_t) * Ll1 + lambda_t * (1.0 - ssim_value)
 
@@ -205,9 +199,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             if (iteration in checkpoint_iterations):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 torch.save((gaussians.capture(), iteration), scene.model_path + "/chkpnt" + str(iteration) + ".pth")
-
-    # ➕ AGREGADO: retornar las listas para graficar después
-    return u_t_list, lambda_t_list
 
 def prepare_output_and_logger(args):    
     if not args.model_path:
@@ -300,55 +291,8 @@ if __name__ == "__main__":
         network_gui.init(args.ip, args.port)
     torch.autograd.set_detect_anomaly(args.detect_anomaly)
 
-    # Extraer argumentos y ejecutar entrenamiento
-    lp_args = lp.extract(args)
-    opt = op.extract(args)
-    pp_args = pp.extract(args)
-
-    opt.iterations = 30000  # Limita el número de iteraciones reales
-    opt.position_lr_max_steps = 30000  # Asegura que el LR se reduzca correctamente
-    args.test_iterations = [opt.iterations]      # Solo evalúa al final
-    args.save_iterations = [opt.iterations]      # Solo guarda al final
-
     # Ejecutar entrenamiento y obtener listas de U(t) y lambda_t
-    u_t_list, lambda_t_list = training(
-    lp_args,
-    opt,
-    pp_args,
-    args.test_iterations,
-    args.save_iterations,
-    args.checkpoint_iterations,
-    args.start_checkpoint,
-    args.debug_from)
-    #training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+    training(lp.extract(args), op.extract(args), pp.extract(args), args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
 
     # All done
     print("\nTraining complete.")
-
-    # ========= GRAFICAR U(t) y λ_t ============
-    plt.figure(figsize=(12, 5))
-
-    # Gráfica de U(t)
-    plt.subplot(1, 2, 1)
-    plt.plot(u_t_list, label='U(t)', color='blue')
-    plt.yscale('log')
-    plt.xlabel('Iteración')
-    plt.ylabel('Incertidumbre U(t)')
-    plt.title('Evolución de la incertidumbre')
-    plt.grid(True)
-    plt.legend()
-
-    # Gráfica de λ_t
-    plt.subplot(1, 2, 2)
-    plt.plot(lambda_t_list, label='λ(t)', color='green')
-    plt.xlabel('Iteración')
-    plt.ylabel('λ_t')
-    plt.title('Evolución de λ_t = 1 - exp(-β·U(t))')
-    plt.grid(True)
-    plt.legend()
-
-    # Guardar gráfico como imagen
-    plt.tight_layout()
-    plt.savefig(os.path.join(lp_args.model_path, "uncertainty_lambda_plot.png"))
-    plt.close()
-
