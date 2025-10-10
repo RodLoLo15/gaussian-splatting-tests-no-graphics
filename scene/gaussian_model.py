@@ -61,7 +61,7 @@ class GaussianModel:
         self.max_radii2D = torch.empty(0)
         self.xyz_gradient_accum = torch.empty(0)
         self.denom = torch.empty(0)
-        self.uncertainty_tracker = EMATracker(alpha=0.1)
+        self.uncertainty_tracker = EMATracker(alpha=0.01)
         self.optimizer = None
         self.percent_dense = 0
         self.spatial_lr_scale = 0
